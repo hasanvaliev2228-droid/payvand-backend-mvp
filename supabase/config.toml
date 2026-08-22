@@ -1,0 +1,38 @@
+# Supabase local development configuration for payvand-backend-mvp.
+project_id = "payvand-backend-mvp"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = []
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.sms]
+enable_signup = true
+enable_confirmations = true
+# Configure a real SMS provider (Twilio / MessageBird / Vonage) in the
+# Supabase dashboard for production phone/OTP auth. Do not commit provider
+# credentials — they belong in project secrets, not this file.
+
+[storage]
+enabled = true
+file_size_limit = "10MiB"
+
+[edge_functions]
+enabled = true
