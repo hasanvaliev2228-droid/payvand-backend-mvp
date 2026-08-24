@@ -19,6 +19,7 @@ import type { Database } from '../../types/database.types';
 import { parseOrThrow } from '../../lib/validation';
 import { setPinSchema, type SetPinInput } from '../../schemas/profile.schema';
 import { AppError } from '../../lib/errors';
+import { DEFAULT_LANGUAGE, type SupportedLanguage } from '../i18n/i18n.service';
 
 export interface PhoneOtpRequestInput {
   phone: string;
@@ -41,6 +42,7 @@ export interface VerifyOtpInput {
 export async function verifyPhoneOtp(
   client: SupabaseClient<Database>,
   input: VerifyOtpInput,
+  lang: SupportedLanguage = DEFAULT_LANGUAGE,
 ): Promise<{ userId: string; accessToken: string; refreshToken: string }> {
   const { data, error } = await client.auth.verifyOtp({
     phone: input.phone,
@@ -48,7 +50,7 @@ export async function verifyPhoneOtp(
     type: 'sms',
   });
   if (error || !data.session || !data.user) {
-    throw AppError.unauthorized('Рамзи OTP нодуруст ё муддаташ гузаштааст.');
+    throw AppError.translated('UNAUTHORIZED', lang, 'auth.invalid_otp');
   }
   return {
     userId: data.user.id,

@@ -3,6 +3,8 @@
  * strings/Errors so API responses can map consistently to HTTP status codes
  * and never leak internal detail to the client.
  */
+import { t, type SupportedLanguage, type TranslationKey } from '../modules/i18n/i18n.service';
+import type { TranslationParams } from '../modules/i18n/i18n.schema';
 
 export type ErrorCode =
   | 'UNAUTHORIZED'
@@ -58,6 +60,23 @@ export class AppError extends Error {
 
   static internal(message = 'Internal error'): AppError {
     return new AppError('INTERNAL_ERROR', message);
+  }
+
+  /**
+   * i18n-aware constructor: resolves `key` via the translation service for
+   * `lang` and builds the AppError from the result. Purely additive — every
+   * existing `AppError.xxx(message)` call site above is untouched and still
+   * works exactly as before; this is an alternative entry point for new/
+   * updated call sites that want a translated message.
+   */
+  static translated(
+    code: ErrorCode,
+    lang: SupportedLanguage,
+    key: TranslationKey,
+    params?: TranslationParams,
+    details?: unknown,
+  ): AppError {
+    return new AppError(code, t(lang, key, params), details);
   }
 }
 

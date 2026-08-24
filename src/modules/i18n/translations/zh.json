@@ -1,0 +1,75 @@
+{
+  "common": {
+    "success": "操作成功完成",
+    "unauthorized": "未授权访问",
+    "forbidden": "您无权执行此操作",
+    "not_found": "未找到信息",
+    "validation_error": "输入的数据无效",
+    "conflict": "发生冲突",
+    "internal_error": "内部错误。请稍后再试",
+    "rate_limited": "请求过于频繁。请稍后再试"
+  },
+  "auth": {
+    "invalid_otp": "OTP 验证码无效或已过期",
+    "otp_sent": "验证码已发送",
+    "signed_out": "您已退出系统",
+    "phone_required": "必须提供电话号码",
+    "session_expired": "登录会话已过期。请重新登录"
+  },
+  "validation": {
+    "required_field": "此字段为必填项",
+    "invalid_format": "数据格式无效",
+    "min_length": "数据长度过短",
+    "max_length": "数据长度过长",
+    "invalid_amount": "金额必须为正数"
+  },
+  "loan": {
+    "created": "贷款已创建",
+    "updated": "贷款信息已更新",
+    "deleted": "贷款已删除",
+    "payment_added": "还款已添加至贷款",
+    "overdue": "贷款还款已逾期",
+    "paid": "贷款已全部还清"
+  },
+  "transaction": {
+    "created": "交易已记录",
+    "updated": "交易已更新",
+    "deleted": "交易已删除"
+  },
+  "chat": {
+    "not_member": "您不是此聊天的成员",
+    "message_not_found": "未找到消息",
+    "conversation_not_found": "未找到会话",
+    "conversation_created": "会话已创建",
+    "message_sent": "消息已发送",
+    "message_deleted": "消息已删除",
+    "attachment_forbidden": "该附件不属于您"
+  },
+  "notification": {
+    "sent": "通知已发送",
+    "marked_read": "通知已标记为已读",
+    "loan_created": "已创建名为“{{title}}”的新贷款",
+    "transaction_created": "已记录一笔金额为 {{amount}} {{currency}} 的新交易",
+    "new_message": "来自 {{sender}} 的新消息",
+    "document_uploaded": "新文档“{{title}}”已上传"
+  },
+  "document": {
+    "uploaded": "文档已上传",
+    "deleted": "文档已删除",
+    "invalid_mime": "不允许此文件类型",
+    "size_exceeded": "文件大小超过允许的限制",
+    "not_found": "未找到文档"
+  },
+  "employee": {
+    "not_found": "未找到员工",
+    "inactive": "非活跃员工无法签到",
+    "attendance_not_found": "未找到考勤记录",
+    "already_checked_out": "该记录已签退"
+  },
+  "note": {
+    "created": "备注已创建",
+    "updated": "备注已更新",
+    "deleted": "备注已删除",
+    "not_found": "未找到备注"
+  }
+}

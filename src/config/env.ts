@@ -18,6 +18,11 @@ const envSchema = z.object({
   FIREBASE_PROJECT_ID: z.string().optional(),
   FIREBASE_CLIENT_EMAIL: z.string().optional(),
   FIREBASE_PRIVATE_KEY: z.string().optional(),
+  // OCR/AI document scanner (src/modules/ocr). Read server-side ONLY — this
+  // key must never be sent to, or readable by, the frontend. When unset,
+  // the OCR provider falls back to a safe mock (see ocr.service.ts).
+  OCR_PROVIDER: z.enum(['mock', 'openai', 'google_vision']).default('mock'),
+  OCR_API_KEY: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

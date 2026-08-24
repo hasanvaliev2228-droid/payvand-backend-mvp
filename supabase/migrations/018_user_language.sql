@@ -1,0 +1,31 @@
+-- 018_user_language.sql
+-- User language preference for the new i18n system
+-- (src/modules/i18n/i18n.service.ts).
+--
+-- IMPORTANT — nothing to add on the column itself: profiles.language
+-- already exists as of 002_roles_profiles.sql:
+--
+--   create type public.app_language as enum ('tg', 'ru', 'en', 'zh');
+--   ...
+--   language public.app_language not null default 'tg',
+--
+-- This already satisfies "language text default 'tg', allowed values
+-- tg/ru/en" (tg/ru/en are valid enum members, 'tg' is the default, and the
+-- column is NOT NULL) — an enum is stricter than a free-text column with a
+-- check constraint, so re-creating it as text would be a downgrade, and
+-- dropping/recreating the enum on a live column risks data loss for no
+-- benefit. Per the "do not rewrite existing features" instruction, this
+-- migration does NOT touch the column or the enum type.
+--
+-- 'zh' remains a valid PROFILE setting (unchanged, not removed) even though
+-- the new translation system (src/modules/i18n/translations/*.json) only
+-- ships tg/ru/en bundles today. i18n.service.ts's resolveLanguage() treats
+-- 'zh' (or anything else outside tg/ru/en) as "unsupported for translation"
+-- and safely falls back to 'tg' — this is an application-layer fallback,
+-- not a database constraint change.
+--
+-- What this migration DOES add: an index to support efficient per-language
+-- queries (e.g. "how many users have ru selected", or a future bulk
+-- notification job segmented by language).
+
+create index if not exists profiles_language_idx on public.profiles(language);

@@ -10,7 +10,7 @@
 export type AppLanguage = 'tg' | 'ru' | 'en' | 'zh';
 export type AppRole = 'user' | 'admin';
 
-interface RawDatabase {
+export interface Database {
   public: {
     Tables: {
       profiles: {
@@ -30,6 +30,7 @@ interface RawDatabase {
         };
         Insert: Partial<Database['public']['Tables']['profiles']['Row']> & { id: string };
         Update: Partial<Database['public']['Tables']['profiles']['Row']>;
+        Relationships: [];
       };
       user_settings: {
         Row: {
@@ -48,6 +49,7 @@ interface RawDatabase {
           user_id: string;
         };
         Update: Partial<Database['public']['Tables']['user_settings']['Row']>;
+        Relationships: [];
       };
       bank_cards: {
         Row: {
@@ -70,6 +72,7 @@ interface RawDatabase {
           last4: string;
         };
         Update: Partial<Database['public']['Tables']['bank_cards']['Row']>;
+        Relationships: [];
       };
       qr_codes: {
         Row: {
@@ -89,6 +92,7 @@ interface RawDatabase {
           payload: string;
         };
         Update: Partial<Database['public']['Tables']['qr_codes']['Row']>;
+        Relationships: [];
       };
       categories: {
         Row: {
@@ -106,6 +110,7 @@ interface RawDatabase {
           type: string;
         };
         Update: Partial<Database['public']['Tables']['categories']['Row']>;
+        Relationships: [];
       };
       transactions: {
         Row: {
@@ -129,6 +134,7 @@ interface RawDatabase {
           title: string;
         };
         Update: Partial<Database['public']['Tables']['transactions']['Row']>;
+        Relationships: [];
       };
       loans: {
         Row: {
@@ -159,6 +165,7 @@ interface RawDatabase {
           payment_frequency: string;
         };
         Update: Partial<Database['public']['Tables']['loans']['Row']>;
+        Relationships: [];
       };
       loan_payments: {
         Row: {
@@ -174,6 +181,7 @@ interface RawDatabase {
           amount: number;
         };
         Update: Partial<Database['public']['Tables']['loan_payments']['Row']>;
+        Relationships: [];
       };
       contacts: {
         Row: {
@@ -191,6 +199,7 @@ interface RawDatabase {
           display_name: string;
         };
         Update: Partial<Database['public']['Tables']['contacts']['Row']>;
+        Relationships: [];
       };
       conversations: {
         Row: {
@@ -207,6 +216,7 @@ interface RawDatabase {
           created_by: string;
         };
         Update: Partial<Database['public']['Tables']['conversations']['Row']>;
+        Relationships: [];
       };
       conversation_members: {
         Row: {
@@ -222,6 +232,7 @@ interface RawDatabase {
           user_id: string;
         };
         Update: Partial<Database['public']['Tables']['conversation_members']['Row']>;
+        Relationships: [];
       };
       direct_conversation_pairs: {
         Row: {
@@ -231,6 +242,7 @@ interface RawDatabase {
         };
         Insert: Database['public']['Tables']['direct_conversation_pairs']['Row'];
         Update: Partial<Database['public']['Tables']['direct_conversation_pairs']['Row']>;
+        Relationships: [];
       };
       messages: {
         Row: {
@@ -240,6 +252,11 @@ interface RawDatabase {
           body: string | null;
           message_type: string;
           file_path: string | null;
+          file_url: string | null;
+          file_name: string | null;
+          file_size: number | null;
+          mime_type: string | null;
+          voice_duration_seconds: number | null;
           reply_to_id: string | null;
           forwarded_from_id: string | null;
           edited_at: string | null;
@@ -251,6 +268,7 @@ interface RawDatabase {
           sender_id: string;
         };
         Update: Partial<Database['public']['Tables']['messages']['Row']>;
+        Relationships: [];
       };
       message_reactions: {
         Row: {
@@ -266,6 +284,7 @@ interface RawDatabase {
           emoji: string;
         };
         Update: Partial<Database['public']['Tables']['message_reactions']['Row']>;
+        Relationships: [];
       };
       documents: {
         Row: {
@@ -295,6 +314,7 @@ interface RawDatabase {
           file_size: number;
         };
         Update: Partial<Database['public']['Tables']['documents']['Row']>;
+        Relationships: [];
       };
       calendar_events: {
         Row: {
@@ -317,6 +337,7 @@ interface RawDatabase {
           start_at: string;
         };
         Update: Partial<Database['public']['Tables']['calendar_events']['Row']>;
+        Relationships: [];
       };
       health_records: {
         Row: {
@@ -336,6 +357,7 @@ interface RawDatabase {
           record_type: string;
         };
         Update: Partial<Database['public']['Tables']['health_records']['Row']>;
+        Relationships: [];
       };
       service_providers: {
         Row: {
@@ -358,6 +380,7 @@ interface RawDatabase {
           category: string;
         };
         Update: Partial<Database['public']['Tables']['service_providers']['Row']>;
+        Relationships: [];
       };
       notifications: {
         Row: {
@@ -375,6 +398,7 @@ interface RawDatabase {
           title: string;
         };
         Update: Partial<Database['public']['Tables']['notifications']['Row']>;
+        Relationships: [];
       };
       device_tokens: {
         Row: {
@@ -392,6 +416,7 @@ interface RawDatabase {
           platform: string;
         };
         Update: Partial<Database['public']['Tables']['device_tokens']['Row']>;
+        Relationships: [];
       };
       offline_sync_events: {
         Row: {
@@ -417,6 +442,7 @@ interface RawDatabase {
           client_created_at: string;
         };
         Update: Partial<Database['public']['Tables']['offline_sync_events']['Row']>;
+        Relationships: [];
       };
       audit_logs: {
         Row: {
@@ -434,6 +460,90 @@ interface RawDatabase {
           entity_type: string;
         };
         Update: Partial<Database['public']['Tables']['audit_logs']['Row']>;
+        Relationships: [];
+      };
+      notes: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string;
+          content: string | null;
+          category: string | null;
+          is_private: boolean;
+          reminder_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['notes']['Row']> & {
+          user_id: string;
+          title: string;
+        };
+        Update: Partial<Database['public']['Tables']['notes']['Row']>;
+        Relationships: [];
+      };
+      employees: {
+        Row: {
+          id: string;
+          owner_id: string;
+          name: string;
+          phone: string | null;
+          position: string | null;
+          salary: number | null;
+          active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['employees']['Row']> & {
+          owner_id: string;
+          name: string;
+        };
+        Update: Partial<Database['public']['Tables']['employees']['Row']>;
+        Relationships: [];
+      };
+      attendance: {
+        Row: {
+          id: string;
+          employee_id: string;
+          check_in: string;
+          check_out: string | null;
+          work_minutes: number | null;
+          date: string;
+          created_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['attendance']['Row']> & {
+          employee_id: string;
+          check_in: string;
+        };
+        Update: Partial<Database['public']['Tables']['attendance']['Row']>;
+        Relationships: [];
+      };
+      document_scans: {
+        Row: {
+          id: string;
+          user_id: string;
+          document_id: string | null;
+          file_path: string;
+          scan_type: string;
+          status: string;
+          provider: string;
+          extracted_merchant_name: string | null;
+          extracted_amount: number | null;
+          extracted_currency: string | null;
+          extracted_date: string | null;
+          extracted_category: string | null;
+          raw_text: string | null;
+          confidence: number | null;
+          error_message: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['document_scans']['Row']> & {
+          user_id: string;
+          file_path: string;
+          scan_type: string;
+        };
+        Update: Partial<Database['public']['Tables']['document_scans']['Row']>;
+        Relationships: [];
       };
     };
     Views: Record<string, never>;
@@ -447,19 +557,3 @@ interface RawDatabase {
     };
   };
 }
-
-/**
- * Supabase v2 requires every table definition to expose a Relationships tuple.
- * The handwritten baseline deliberately does not model joins yet, so each
- * table has an empty tuple. Keep the raw shape above focused on columns and
- * use this normalized exported type everywhere a Supabase client is created.
- */
-export type Database = {
-  public: Omit<RawDatabase['public'], 'Tables'> & {
-    Tables: {
-      [
-        TableName in keyof RawDatabase['public']['Tables']
-      ]: RawDatabase['public']['Tables'][TableName] & { Relationships: [] };
-    };
-  };
-};

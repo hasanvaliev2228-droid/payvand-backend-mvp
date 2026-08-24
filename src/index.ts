@@ -25,3 +25,8 @@ export * as NotificationsModule from './modules/notifications/notifications.serv
 export * as OfflineSyncModule from './modules/offline-sync/offline-sync.service';
 export * as AdminModule from './modules/admin/admin.service';
 export * as AuthModule from './modules/auth/auth.service';
+export * as NotesModule from './modules/notes/notes.service';
+export * as EmployeesModule from './modules/employees/employees.service';
+export * as I18nModule from './modules/i18n/i18n.service';
+export * as OcrModule from './modules/ocr/ocr.service';
+export * as ThemeModule from './modules/theme/theme.service';

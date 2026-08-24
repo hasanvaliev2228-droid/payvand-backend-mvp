@@ -30,6 +30,7 @@ import {
 } from '../../schemas/message.schema';
 import type { ListResult } from '../../types/api.types';
 import { AppError } from '../../lib/errors';
+import { DEFAULT_LANGUAGE, type SupportedLanguage } from '../i18n/i18n.service';
 
 type ConversationRow = Database['public']['Tables']['conversations']['Row'];
 type MessageRow = Database['public']['Tables']['messages']['Row'];
@@ -68,6 +69,7 @@ export async function sendMessage(
 export async function editMessage(
   client: SupabaseClient<Database>,
   input: EditMessageInput,
+  lang: SupportedLanguage = DEFAULT_LANGUAGE,
 ): Promise<MessageRow> {
   const values = parseOrThrow(editMessageSchema, input);
   const { data, error } = await client
@@ -77,7 +79,7 @@ export async function editMessage(
     .select('*')
     .maybeSingle();
   if (error) throw AppError.internal(error.message);
-  if (!data) throw AppError.notFound();
+  if (!data) throw AppError.translated('NOT_FOUND', lang, 'chat.message_not_found');
   return data;
 }
 
@@ -85,6 +87,7 @@ export async function editMessage(
 export async function deleteMessage(
   client: SupabaseClient<Database>,
   messageId: string,
+  lang: SupportedLanguage = DEFAULT_LANGUAGE,
 ): Promise<MessageRow> {
   const { data, error } = await client
     .from('messages')
@@ -93,7 +96,7 @@ export async function deleteMessage(
     .select('*')
     .maybeSingle();
   if (error) throw AppError.internal(error.message);
-  if (!data) throw AppError.notFound();
+  if (!data) throw AppError.translated('NOT_FOUND', lang, 'chat.message_not_found');
   return data;
 }
 
