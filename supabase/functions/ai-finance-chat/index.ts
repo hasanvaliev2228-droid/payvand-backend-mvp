@@ -1,6 +1,8 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 import { z } from 'npm:zod@3.23.8';
+import { AiFinanceProviderError } from '../../../src/modules/ai/ai.types.ts';
+import { GeminiFinanceProvider } from './gemini-finance.provider.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -33,27 +35,25 @@ serve(async (req) => {
         { ok: false, error: { code: 'VALIDATION_ERROR', message: 'Маълумот нодуруст аст.' } },
         422,
       );
-    // A provider must be explicitly configured as a server secret. This endpoint intentionally does not fabricate advice or use client-provided API keys.
-    if (!Deno.env.get('AI_FINANCE_API_KEY'))
-      return json({
-        ok: true,
-        data: {
-          provider: 'mock',
-          status: 'not_configured',
-          message: 'AI provider is not configured.',
-        },
-      });
-    return json(
-      {
-        ok: false,
-        error: {
-          code: 'PROVIDER_NOT_IMPLEMENTED',
-          message: 'AI provider adapter needs a configured server-side implementation.',
-        },
-      },
-      501,
-    );
-  } catch {
+    // GEMINI_API_KEY is a Supabase server secret. Client-supplied keys are never accepted.
+    const provider = new GeminiFinanceProvider(Deno.env.get('GEMINI_API_KEY'));
+    const result = await provider.analyze({
+      summary: parsed.data.summary ?? {},
+      question: parsed.data.message,
+    });
+    return json({
+      ok: true,
+      data: { provider: result.provider, status: result.status, message: result.text },
+    });
+  } catch (error) {
+    if (error instanceof AiFinanceProviderError) {
+      const status = error.code === 'RATE_LIMITED' ? 429 : error.code === 'INVALID_RESPONSE' ? 502 : 503;
+      const message =
+        error.code === 'RATE_LIMITED'
+          ? 'Дархостҳо хеле зиёданд. Лутфан баъдтар кӯшиш кунед.'
+          : 'Хидмати AI муваққатан дастрас нест.';
+      return json({ ok: false, error: { code: error.code, message } }, status);
+    }
     return json({ ok: false, error: { code: 'INTERNAL_ERROR', message: 'Хатогии дохилӣ.' } }, 500);
   }
 });
