@@ -8,9 +8,12 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 const FUNCTIONS_DIR = path.resolve(__dirname, '../supabase/functions');
+
 const functionNames = readdirSync(FUNCTIONS_DIR).filter((f) =>
   statSync(path.join(FUNCTIONS_DIR, f)).isDirectory(),
 );
+
+const publicOtpFunctions = new Set(['request-otp', 'verify-otp']);
 
 describe('Edge Function conventions', () => {
   it('discovers all shipped Edge Functions', () => {
@@ -27,8 +30,8 @@ describe('Edge Function conventions', () => {
         'create-payment-request',
         'create-qr',
         'delete-account',
-        'finance-analysis',
         'delete-note',
+        'finance-analysis',
         'generate-upload-url',
         'get-notes',
         'list-employees',
@@ -37,6 +40,7 @@ describe('Edge Function conventions', () => {
         'notify-loan-reminders',
         'notify-security-event',
         'receipt-to-transaction',
+        'request-otp',
         'scan-document',
         'send-message',
         'send-notification',
@@ -45,25 +49,35 @@ describe('Edge Function conventions', () => {
         'update-theme',
         'upload-chat-media',
         'upload-document',
+        'verify-otp',
       ].sort(),
     );
   });
 
   for (const name of functionNames) {
-    const source = readFileSync(path.join(FUNCTIONS_DIR, name, 'index.ts'), 'utf-8');
+    const source = readFileSync(
+      path.join(FUNCTIONS_DIR, name, 'index.ts'),
+      'utf-8',
+    );
 
     it(`${name}: handles CORS preflight`, () => {
-      expect(source).toMatch(/req\.method === 'OPTIONS'/);
+      expect(source).toMatch(/req\.method === ["']OPTIONS["']/);
       expect(source).toMatch(/Access-Control-Allow-Origin/);
     });
 
-    it(`${name}: extracts the user from the Authorization header via getUser()`, () => {
+    it(`${name}: has the expected auth boundary`, () => {
+      if (publicOtpFunctions.has(name)) {
+        expect(source).not.toMatch(/auth\.getUser\(\)/);
+        expect(source).toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
+        return;
+      }
+
       expect(source).toMatch(/Authorization/);
       expect(source).toMatch(/auth\.getUser\(\)/);
     });
 
     it(`${name}: validates input with a Zod schema`, () => {
-      expect(source).toMatch(/from 'npm:zod@/);
+      expect(source).toMatch(/from ["']npm:zod@/);
       expect(source).toMatch(/safeParse/);
     });
 
@@ -74,6 +88,12 @@ describe('Edge Function conventions', () => {
 
     it(`${name}: never returns a raw internal error message to the client`, () => {
       // Catch-all handlers must return a generic message, not err.message.
+      if (publicOtpFunctions.has(name)) {
+        expect(source).not.toMatch(/err\.message|error\.message/);
+        expect(source).not.toMatch(/,\s*502\)/);
+        return;
+      }
+
       expect(source).toMatch(/Хатогии дохилӣ/);
     });
   }
@@ -92,9 +112,16 @@ describe('Edge Function conventions', () => {
       'notify-employee-attendance',
       'notify-security-event',
       'receipt-to-transaction',
+      'request-otp',
+      'verify-otp',
     ];
+
     for (const name of elevated) {
-      const source = readFileSync(path.join(FUNCTIONS_DIR, name, 'index.ts'), 'utf-8');
+      const source = readFileSync(
+        path.join(FUNCTIONS_DIR, name, 'index.ts'),
+        'utf-8',
+      );
+
       expect(source).toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
     }
   });
@@ -107,33 +134,50 @@ describe('Service-role key isolation (client-safe module graph)', () => {
     for (const entry of readdirSync(dir)) {
       const full = path.join(dir, entry);
       const stat = statSync(full);
-      if (stat.isDirectory()) walk(full, files);
-      else if (entry.endsWith('.ts')) files.push(full);
+
+      if (stat.isDirectory()) {
+        walk(full, files);
+      } else if (entry.endsWith('.ts')) {
+        files.push(full);
+      }
     }
+
     return files;
   }
 
   it('no module/service file imports supabase-admin.ts', () => {
     const moduleFiles = walk(path.join(root, 'src/modules'));
+
     const offenders = moduleFiles.filter((f) =>
       readFileSync(f, 'utf-8').includes('supabase-admin'),
     );
+
     expect(offenders).toEqual([]);
   });
 
   it('supabase-client.ts (the frontend-safe client) never references the service role key', () => {
-    const content = readFileSync(path.join(root, 'src/lib/supabase-client.ts'), 'utf-8');
+    const content = readFileSync(
+      path.join(root, 'src/lib/supabase-client.ts'),
+      'utf-8',
+    );
+
     expect(content).not.toMatch(/SERVICE_ROLE/);
   });
 
   it('no hardcoded secret-looking literal appears in src/ (keys are always read from env)', () => {
     const files = walk(path.join(root, 'src'));
+
     const suspicious =
       /['"]sk_[a-zA-Z0-9]{10,}['"]|['"]ey[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}['"]/;
+
     const offenders: string[] = [];
+
     for (const f of files) {
-      if (suspicious.test(readFileSync(f, 'utf-8'))) offenders.push(f);
+      if (suspicious.test(readFileSync(f, 'utf-8'))) {
+        offenders.push(f);
+      }
     }
+
     expect(offenders).toEqual([]);
   });
 });
