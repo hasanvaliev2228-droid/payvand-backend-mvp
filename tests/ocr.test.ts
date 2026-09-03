@@ -138,7 +138,7 @@ describe('Security', () => {
     expect(scanFnSource).not.toMatch(/data:\s*\{[^}]*apiKey/i);
     // The only place OCR_API_KEY appears is a Deno.env.get(...) read.
     const occurrences = scanFnSource.match(/OCR_API_KEY/g) ?? [];
-    for (const _ of occurrences) {
+    for (let index = 0; index < occurrences.length; index += 1) {
       expect(scanFnSource).toMatch(/Deno\.env\.get\('OCR_API_KEY'\)/);
     }
   });
@@ -182,7 +182,9 @@ describe('Mock OCR provider (used when OCR_API_KEY is not configured)', () => {
 
 describe('Database structure', () => {
   it('links optionally to an existing document via document_id (nullable, ON DELETE SET NULL)', () => {
-    expect(migrationSql).toMatch(/document_id uuid references public\.documents\(id\) on delete set null/);
+    expect(migrationSql).toMatch(
+      /document_id uuid references public\.documents\(id\) on delete set null/,
+    );
   });
 
   it('constrains scan_type to the four supported kinds', () => {

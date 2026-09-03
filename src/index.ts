@@ -30,3 +30,8 @@ export * as EmployeesModule from './modules/employees/employees.service';
 export * as I18nModule from './modules/i18n/i18n.service';
 export * as OcrModule from './modules/ocr/ocr.service';
 export * as ThemeModule from './modules/theme/theme.service';
+export * from './modules/finance/finance-engine';
+export * from './modules/finance/budget-engine';
+export * from './modules/finance/finance.schema';
+export * from './modules/providers/provider.types';
+export * from './modules/ai/ai.types';

@@ -13,18 +13,21 @@ const functionNames = readdirSync(FUNCTIONS_DIR).filter((f) =>
 );
 
 describe('Edge Function conventions', () => {
-  it('discovers exactly the 25 required Edge Functions', () => {
+  it('discovers all shipped Edge Functions', () => {
     expect(functionNames.sort()).toEqual(
       [
         'attendance-report',
+        'ai-finance-chat',
         'calculate-loan',
         'check-in',
         'check-out',
         'create-conversation',
         'create-employee',
         'create-note',
+        'create-payment-request',
         'create-qr',
         'delete-account',
+        'finance-analysis',
         'delete-note',
         'generate-upload-url',
         'get-notes',
@@ -33,6 +36,7 @@ describe('Edge Function conventions', () => {
         'notify-employee-attendance',
         'notify-loan-reminders',
         'notify-security-event',
+        'receipt-to-transaction',
         'scan-document',
         'send-message',
         'send-notification',
@@ -79,6 +83,7 @@ describe('Edge Function conventions', () => {
       'send-notification',
       'generate-upload-url',
       'create-conversation',
+      'create-payment-request',
       'sync-offline-events',
       'delete-account',
       'upload-document',
@@ -86,6 +91,7 @@ describe('Edge Function conventions', () => {
       'notify-loan-reminders',
       'notify-employee-attendance',
       'notify-security-event',
+      'receipt-to-transaction',
     ];
     for (const name of elevated) {
       const source = readFileSync(path.join(FUNCTIONS_DIR, name, 'index.ts'), 'utf-8');
@@ -122,7 +128,8 @@ describe('Service-role key isolation (client-safe module graph)', () => {
 
   it('no hardcoded secret-looking literal appears in src/ (keys are always read from env)', () => {
     const files = walk(path.join(root, 'src'));
-    const suspicious = /['"]sk_[a-zA-Z0-9]{10,}['"]|['"]ey[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}['"]/;
+    const suspicious =
+      /['"]sk_[a-zA-Z0-9]{10,}['"]|['"]ey[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}['"]/;
     const offenders: string[] = [];
     for (const f of files) {
       if (suspicious.test(readFileSync(f, 'utf-8'))) offenders.push(f);

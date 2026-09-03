@@ -23,6 +23,8 @@ const envSchema = z.object({
   // the OCR provider falls back to a safe mock (see ocr.service.ts).
   OCR_PROVIDER: z.enum(['mock', 'openai', 'google_vision']).default('mock'),
   OCR_API_KEY: z.string().optional(),
+  // Optional, server-side-only key for a deliberately explicit AI adapter.
+  AI_FINANCE_API_KEY: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
