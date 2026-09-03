@@ -21,6 +21,7 @@ describe('Edge Function conventions', () => {
       [
         'attendance-report',
         'ai-finance-chat',
+        'barcode-lookup',
         'calculate-loan',
         'check-in',
         'check-out',
@@ -55,10 +56,7 @@ describe('Edge Function conventions', () => {
   });
 
   for (const name of functionNames) {
-    const source = readFileSync(
-      path.join(FUNCTIONS_DIR, name, 'index.ts'),
-      'utf-8',
-    );
+    const source = readFileSync(path.join(FUNCTIONS_DIR, name, 'index.ts'), 'utf-8');
 
     it(`${name}: handles CORS preflight`, () => {
       expect(source).toMatch(/req\.method === ["']OPTIONS["']/);
@@ -112,15 +110,13 @@ describe('Edge Function conventions', () => {
       'notify-employee-attendance',
       'notify-security-event',
       'receipt-to-transaction',
+      'barcode-lookup',
       'request-otp',
       'verify-otp',
     ];
 
     for (const name of elevated) {
-      const source = readFileSync(
-        path.join(FUNCTIONS_DIR, name, 'index.ts'),
-        'utf-8',
-      );
+      const source = readFileSync(path.join(FUNCTIONS_DIR, name, 'index.ts'), 'utf-8');
 
       expect(source).toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
     }
@@ -156,10 +152,7 @@ describe('Service-role key isolation (client-safe module graph)', () => {
   });
 
   it('supabase-client.ts (the frontend-safe client) never references the service role key', () => {
-    const content = readFileSync(
-      path.join(root, 'src/lib/supabase-client.ts'),
-      'utf-8',
-    );
+    const content = readFileSync(path.join(root, 'src/lib/supabase-client.ts'), 'utf-8');
 
     expect(content).not.toMatch(/SERVICE_ROLE/);
   });

@@ -29,7 +29,11 @@ import type { ListOptions } from '../../lib/base-repository';
 import { parseOrThrow } from '../../lib/validation';
 import { AppError } from '../../lib/errors';
 import { getEnv } from '../../config/env';
-import { extractedDataSchema, updateScanSchema, type UpdateScanInput } from './ocr.schema';
+import {
+  extractedDataSchema,
+  updateScanSchema,
+  type UpdateScanInput,
+} from './ocr.schema';
 import type {
   DocumentScanRow,
   ExtractedDocumentData,
@@ -43,38 +47,45 @@ import type { ListResult } from '../../types/api.types';
 // ---------------------------------------------------------------------------
 
 /**
- * Mock provider: used whenever OCR_API_KEY isn't configured (default in
- * every environment until a real key is provisioned — mirrors the mock
- * push-notification adapter in send-notification/index.ts). Returns a
- * clearly-labeled, low-confidence placeholder result rather than fabricating
- * a confident-looking fake extraction.
+ * Controlled fallback for callers without a configured OCR provider.
+ *
+ * IMPORTANT:
+ * This provider NEVER returns fabricated OCR data.
+ * Callers receive a controlled configuration error instead.
+ *
+ * The production Edge Function (`scan-document`) has its own Google Vision
+ * adapter and records a controlled `not_configured` failure when no
+ * production OCR provider is configured.
  */
-export const mockOcrProvider: OcrProvider = {
-  name: 'mock',
-  async extract(_imageBytes, _mimeType, _scanType): Promise<ExtractedDocumentData> {
-    return {
-      raw_text: '[mock OCR — no OCR_API_KEY configured; configure one to enable real extraction]',
-      confidence: 0,
-    };
+export const unavailableOcrProvider: OcrProvider = {
+  name: 'not_configured',
+
+  async extract(): Promise<ExtractedDocumentData> {
+    throw AppError.internal('OCR provider is not configured.');
   },
 };
 
 /**
- * Real provider extension point. Deliberately NOT wired to a live network
- * call in this codebase (no outbound network access from this build
- * environment, and doing so would require committing to one specific
- * vendor's request/response shape). To activate: implement `extract()`
- * using `fetch()` against your chosen OCR/AI vendor, authenticated with
- * `getEnv().OCR_API_KEY` — never hardcode the key, and never return it (or
- * any other secret) as part of ExtractedDocumentData.
+ * Real provider extension point.
+ *
+ * The production `scan-document` Edge Function currently owns the live
+ * Google Vision adapter. This in-process service intentionally does not
+ * manufacture OCR data when a provider is unavailable.
+ *
+ * To activate another provider here, implement `extract()` using the
+ * provider's API and authenticate with the server-side OCR_API_KEY.
+ * Never hardcode or return the provider API key.
  */
-function buildRealOcrProvider(providerName: 'openai' | 'google_vision', _apiKey: string): OcrProvider {
+function buildRealOcrProvider(
+  providerName: 'openai' | 'google_vision',
+  _apiKey: string,
+): OcrProvider {
   return {
     name: providerName,
+
     async extract(): Promise<ExtractedDocumentData> {
       throw AppError.internal(
-        `OCR provider "${providerName}" is configured but not yet implemented. ` +
-          'Implement extract() in ocr.service.ts using getEnv().OCR_API_KEY, or set OCR_PROVIDER=mock.',
+        `OCR provider "${providerName}" is configured but not yet implemented.`,
       );
     },
   };
@@ -82,7 +93,11 @@ function buildRealOcrProvider(providerName: 'openai' | 'google_vision', _apiKey:
 
 export function getOcrProvider(): OcrProvider {
   const env = getEnv();
-  if (env.OCR_PROVIDER === 'mock' || !env.OCR_API_KEY) return mockOcrProvider;
+
+  if (env.OCR_PROVIDER === 'disabled' || !env.OCR_API_KEY) {
+    return unavailableOcrProvider;
+  }
+
   return buildRealOcrProvider(env.OCR_PROVIDER, env.OCR_API_KEY);
 }
 
@@ -93,24 +108,36 @@ export function getOcrProvider(): OcrProvider {
 export async function listMyScans(
   client: SupabaseClient<Database>,
   userId: string,
-  options: Omit<ListOptions, 'filters'> & { scan_type?: ScanType; status?: string },
+  options: Omit<ListOptions, 'filters'> & {
+    scan_type?: ScanType;
+    status?: string;
+  },
 ): Promise<ListResult<DocumentScanRow>> {
   const { scan_type, status, ...rest } = options;
+
   return listRows<DocumentScanRow>(client, 'document_scans', {
     ...rest,
-    filters: { user_id: userId, scan_type, status },
+    filters: {
+      user_id: userId,
+      scan_type,
+      status,
+    },
   });
 }
 
-export async function getMyScan(client: SupabaseClient<Database>, id: string): Promise<DocumentScanRow> {
+export async function getMyScan(
+  client: SupabaseClient<Database>,
+  id: string,
+): Promise<DocumentScanRow> {
   return getRowById<DocumentScanRow>(client, 'document_scans', id);
 }
 
 /**
- * Persists a scan result. `extracted` is validated with extractedDataSchema
- * before any of it is trusted and written to the row — this is the
- * boundary between "whatever the OCR/AI provider returned" and "what we
- * actually store".
+ * Persists a scan result.
+ *
+ * `extracted` is validated with extractedDataSchema before any of it is
+ * trusted and written to the row. This is the boundary between
+ * "whatever the OCR/AI provider returned" and "what we actually store".
  */
 export async function saveScanResult(
   client: SupabaseClient<Database>,
@@ -125,7 +152,9 @@ export async function saveScanResult(
     documentId?: string;
   },
 ): Promise<DocumentScanRow> {
-  const validatedExtraction = params.extracted ? parseOrThrow(extractedDataSchema, params.extracted) : undefined;
+  const validatedExtraction = params.extracted
+    ? parseOrThrow(extractedDataSchema, params.extracted)
+    : undefined;
 
   return insertRow<DocumentScanRow>(client, 'document_scans', {
     user_id: params.userId,
@@ -151,9 +180,18 @@ export async function updateScan(
   input: UpdateScanInput,
 ): Promise<DocumentScanRow> {
   const values = parseOrThrow(updateScanSchema, input);
-  return updateRowById<DocumentScanRow>(client, 'document_scans', id, values);
+
+  return updateRowById<DocumentScanRow>(
+    client,
+    'document_scans',
+    id,
+    values,
+  );
 }
 
-export async function deleteScan(client: SupabaseClient<Database>, id: string): Promise<void> {
+export async function deleteScan(
+  client: SupabaseClient<Database>,
+  id: string,
+): Promise<void> {
   return deleteRowById(client, 'document_scans', id);
 }

@@ -16,12 +16,13 @@ import {
   scanTypeSchema,
   updateScanSchema,
 } from '../src/modules/ocr/ocr.schema';
-import { getOcrProvider, mockOcrProvider } from '../src/modules/ocr/ocr.service';
+import { getOcrProvider, unavailableOcrProvider } from '../src/modules/ocr/ocr.service';
 
 const migrationSql = readFileSync(
   path.resolve(__dirname, '../supabase/migrations/019_document_scans.sql'),
   'utf-8',
 );
+
 const scanFnSource = readFileSync(
   path.resolve(__dirname, '../supabase/functions/scan-document/index.ts'),
   'utf-8',
@@ -41,6 +42,7 @@ describe('Workflow support: receipts, invoices, business & personal documents', 
       file_base64: Buffer.from('fake-bytes').toString('base64'),
       scan_type: 'receipt',
     });
+
     expect(result.success).toBe(true);
   });
 
@@ -52,6 +54,7 @@ describe('Workflow support: receipts, invoices, business & personal documents', 
       scan_type: 'invoice',
       document_id: '11111111-1111-1111-1111-111111111111',
     });
+
     expect(result.success).toBe(true);
   });
 });
@@ -70,6 +73,7 @@ describe('Validation', () => {
       file_base64: 'AAAA',
       scan_type: 'receipt',
     });
+
     expect(result.success).toBe(false);
   });
 
@@ -104,7 +108,9 @@ describe('Validation', () => {
   });
 
   it('updateScanSchema allows clearing extracted fields with null', () => {
-    expect(updateScanSchema.safeParse({ extracted_merchant_name: null }).success).toBe(true);
+    expect(
+      updateScanSchema.safeParse({ extracted_merchant_name: null }).success,
+    ).toBe(true);
   });
 });
 
@@ -112,14 +118,20 @@ describe('Security', () => {
   it('scan-document requires authentication before anything else', () => {
     const authIdx = scanFnSource.indexOf('UNAUTHORIZED');
     const uploadIdx = scanFnSource.indexOf('.storage');
+
     expect(authIdx).toBeGreaterThan(-1);
     expect(uploadIdx).toBeGreaterThan(-1);
     expect(authIdx).toBeLessThan(uploadIdx);
   });
 
   it('stores the source file under {user_id}/scans/... in the EXISTING documents bucket (no new bucket)', () => {
-    expect(scanFnSource).toMatch(/`\$\{userId\}\/scans\/\$\{scanId\}\.\$\{extension\}`/);
-    expect(scanFnSource).toMatch(/supabase\.storage\s*\n?\s*\.from\('documents'\)/);
+    expect(scanFnSource).toMatch(
+      /`\$\{userId\}\/scans\/\$\{scanId\}\.\$\{extension\}`/,
+    );
+
+    expect(scanFnSource).toMatch(
+      /supabase\.storage\s*\n?\s*\.from\('documents'\)/,
+    );
   });
 
   it('verifies ownership of a referenced document_id before linking a scan to it', () => {
@@ -130,53 +142,99 @@ describe('Security', () => {
   it('enforces the size limit before ever touching Storage', () => {
     const sizeCheckIdx = scanFnSource.indexOf('bytes.length > MAX_SIZE_BYTES');
     const uploadIdx = scanFnSource.indexOf('.storage');
+
     expect(sizeCheckIdx).toBeGreaterThan(-1);
     expect(sizeCheckIdx).toBeLessThan(uploadIdx);
   });
 
   it('never returns OCR_API_KEY in the response (only reads it from Deno.env, never echoes it)', () => {
     expect(scanFnSource).not.toMatch(/data:\s*\{[^}]*apiKey/i);
-    // The only place OCR_API_KEY appears is a Deno.env.get(...) read.
-    const occurrences = scanFnSource.match(/OCR_API_KEY/g) ?? [];
-    for (let index = 0; index < occurrences.length; index += 1) {
-      expect(scanFnSource).toMatch(/Deno\.env\.get\('OCR_API_KEY'\)/);
-    }
+
+    expect(scanFnSource).toMatch(
+      /Deno\.env\.get\('OCR_API_KEY'\)/,
+    );
   });
 
   it('RLS: document_scans is enabled and owner-scoped', () => {
-    expect(migrationSql).toMatch(/alter table public\.document_scans enable row level security;/);
+    expect(migrationSql).toMatch(
+      /alter table public\.document_scans enable row level security;/,
+    );
+
     expect(migrationSql).toMatch(
       /create policy document_scans_owner_all on public\.document_scans\s*\n\s*for all using \(user_id = auth\.uid\(\)\) with check \(user_id = auth\.uid\(\)\);/,
     );
   });
 
   it('validates extracted provider output server-side too (not just client-side schema)', () => {
-    expect(scanFnSource).toMatch(/extractedDataSchema\.safeParse\(result\.data\)/);
+    expect(scanFnSource).toMatch(
+      /extractedDataSchema\.safeParse\(result\.data\)/,
+    );
+
     expect(scanFnSource).toMatch(/status = 'failed'/);
   });
 });
 
-describe('Mock OCR provider (used when OCR_API_KEY is not configured)', () => {
-  it('returns a low-confidence, clearly-labeled placeholder rather than a fake confident result', () => {
-    expect(mockOcrProvider.name).toBe('mock');
+describe('OCR provider configuration', () => {
+  it('uses an explicitly labelled unavailable provider when OCR is not configured', () => {
+    expect(unavailableOcrProvider.name).toBe('not_configured');
   });
 
-  it('getOcrProvider() defaults to mock when no OCR_API_KEY is set', async () => {
+  it('getOcrProvider() returns the unavailable provider when OCR is disabled', async () => {
     const { resetEnvCache } = await import('../src/config/env');
+
     const previousEnv = { ...process.env };
+
     resetEnvCache();
+
     process.env.SUPABASE_URL = 'https://example.supabase.co';
     process.env.SUPABASE_ANON_KEY = 'test-anon-key';
     delete process.env.OCR_API_KEY;
-    process.env.OCR_PROVIDER = 'mock';
+    process.env.OCR_PROVIDER = 'disabled';
 
     try {
       const provider = getOcrProvider();
-      expect(provider.name).toBe('mock');
+
+      expect(provider.name).toBe('not_configured');
+      expect(provider).toBe(unavailableOcrProvider);
     } finally {
       process.env = previousEnv;
       resetEnvCache();
     }
+  });
+
+  it('never exposes a mock OCR provider or fabricated OCR text', () => {
+    expect(scanFnSource).not.toMatch(/mock OCR/i);
+    expect(scanFnSource).not.toMatch(/OCR_PROVIDER=mock/i);
+  });
+});
+
+describe('Production OCR adapter', () => {
+  const providerSource = readFileSync(
+    path.resolve(
+      __dirname,
+      '../supabase/functions/scan-document/google-vision.provider.ts',
+    ),
+    'utf-8',
+  );
+
+  it('uses the server-side Google Vision adapter with a timeout', () => {
+    expect(providerSource).toMatch(/vision\.googleapis\.com/);
+    expect(providerSource).toMatch(/AbortSignal\.timeout\(15_000\)/);
+    expect(providerSource).toMatch(/NOT_CONFIGURED/);
+  });
+
+  it('does not manufacture OCR data when no provider is configured', () => {
+    expect(scanFnSource).toMatch(
+      /provider\s*=\s*Deno\.env\.get\('OCR_PROVIDER'\)\s*===\s*'google_vision'\s*\?\s*'google_vision'\s*:\s*'not_configured'/,
+    );
+
+    expect(scanFnSource).toMatch(
+      /OCR provider is not configured/,
+    );
+
+    expect(scanFnSource).not.toMatch(
+      /\[mock OCR/i,
+    );
   });
 });
 

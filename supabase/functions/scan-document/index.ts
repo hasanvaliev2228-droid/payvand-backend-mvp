@@ -16,6 +16,7 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 import { z } from 'npm:zod@3.23.8';
+import { extractWithGoogleVision, OcrProviderError } from './google-vision.provider.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -67,47 +68,30 @@ function decodeBase64ToBytes(b64: string): Uint8Array {
   return bytes;
 }
 
-/**
- * Mock OCR/AI extraction — used whenever OCR_API_KEY is not configured.
- * Mirrors src/modules/ocr/ocr.service.ts#mockOcrProvider. A real provider
- * integration would call out to the configured vendor here, authenticated
- * with OCR_API_KEY, and return the same ExtractedDocumentData shape.
- */
 async function extractDocumentData(
-  _bytes: Uint8Array,
-  _mimeType: string,
+  bytes: Uint8Array,
+  mimeType: string,
   _scanType: string,
 ): Promise<{ provider: string; data: z.infer<typeof extractedDataSchema> }> {
-  const provider = Deno.env.get('OCR_PROVIDER') ?? 'mock';
-  const apiKey = Deno.env.get('OCR_API_KEY');
-
-  if (provider === 'mock' || !apiKey) {
-    return {
-      provider: 'mock',
-      data: {
-        raw_text: '[mock OCR — no OCR_API_KEY configured; configure one to enable real extraction]',
-        confidence: 0,
-      },
-    };
-  }
-
-  // Real provider extension point: call the configured OCR/AI vendor here
-  // using `apiKey`, map its response into `extractedDataSchema`'s shape,
-  // and return it. Left unimplemented (no live network access from this
-  // codebase, and each vendor's request/response shape differs) rather
-  // than faking a network call.
-  throw new Error(
-    `OCR provider "${provider}" is configured but not yet implemented in scan-document/index.ts.`,
-  );
+  if (Deno.env.get('OCR_PROVIDER') !== 'google_vision')
+    throw new OcrProviderError('NOT_CONFIGURED');
+  return {
+    provider: 'google_vision',
+    data: await extractWithGoogleVision(bytes, mimeType, Deno.env.get('OCR_API_KEY')),
+  };
 }
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
     const authHeader = req.headers.get('Authorization') ?? '';
-    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      {
+        global: { headers: { Authorization: authHeader } },
+      },
+    );
 
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError || !userData.user) {
@@ -119,7 +103,14 @@ serve(async (req) => {
     const parsed = bodySchema.safeParse(raw);
     if (!parsed.success) {
       return json(
-        { ok: false, error: { code: 'VALIDATION_ERROR', message: 'Маълумот нодуруст аст.', details: parsed.error.flatten() } },
+        {
+          ok: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Маълумот нодуруст аст.',
+            details: parsed.error.flatten(),
+          },
+        },
         422,
       );
     }
@@ -144,11 +135,20 @@ serve(async (req) => {
     try {
       bytes = decodeBase64ToBytes(file_base64);
     } catch {
-      return json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'file_base64 нодуруст аст.' } }, 422);
+      return json(
+        { ok: false, error: { code: 'VALIDATION_ERROR', message: 'file_base64 нодуруст аст.' } },
+        422,
+      );
     }
     if (bytes.length === 0 || bytes.length > MAX_SIZE_BYTES) {
       return json(
-        { ok: false, error: { code: 'VALIDATION_ERROR', message: `Андозаи файл набояд аз ${MAX_SIZE_BYTES / (1024 * 1024)}MB зиёд бошад.` } },
+        {
+          ok: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: `Андозаи файл набояд аз ${MAX_SIZE_BYTES / (1024 * 1024)}MB зиёд бошад.`,
+          },
+        },
         422,
       );
     }
@@ -161,11 +161,15 @@ serve(async (req) => {
       .from('documents')
       .upload(objectPath, bytes, { contentType: mime_type, upsert: false });
     if (uploadError) {
-      return json({ ok: false, error: { code: 'INTERNAL_ERROR', message: uploadError.message } }, 500);
+      return json(
+        { ok: false, error: { code: 'INTERNAL_ERROR', message: uploadError.message } },
+        500,
+      );
     }
 
     let status: 'completed' | 'failed' = 'completed';
-    let provider = 'mock';
+    let provider =
+      Deno.env.get('OCR_PROVIDER') === 'google_vision' ? 'google_vision' : 'not_configured';
     let extracted: z.infer<typeof extractedDataSchema> | undefined;
     let errorMessage: string | undefined;
 
@@ -183,7 +187,13 @@ serve(async (req) => {
       }
     } catch (err) {
       status = 'failed';
-      errorMessage = err instanceof Error ? err.message : 'Хатогии номаълуми OCR.';
+      // Do not disclose provider/internal failures to the client or store secrets.
+      errorMessage =
+        err instanceof OcrProviderError && err.code === 'NOT_CONFIGURED'
+          ? 'OCR provider is not configured.'
+          : err instanceof OcrProviderError && err.code === 'UNSUPPORTED_MEDIA'
+            ? 'Configured OCR provider does not support this media type.'
+            : 'OCR provider could not process the document.';
     }
 
     const { data: scan, error: insertError } = await supabase
@@ -208,7 +218,10 @@ serve(async (req) => {
       .select('*')
       .single();
     if (insertError) {
-      return json({ ok: false, error: { code: 'INTERNAL_ERROR', message: insertError.message } }, 500);
+      return json(
+        { ok: false, error: { code: 'INTERNAL_ERROR', message: insertError.message } },
+        500,
+      );
     }
 
     return json({ ok: true, data: scan }, 201);

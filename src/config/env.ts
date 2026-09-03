@@ -21,8 +21,9 @@ const envSchema = z.object({
   // OCR/AI document scanner (src/modules/ocr). Read server-side ONLY — this
   // key must never be sent to, or readable by, the frontend. When unset,
   // the OCR provider falls back to a safe mock (see ocr.service.ts).
-  OCR_PROVIDER: z.enum(['mock', 'openai', 'google_vision']).default('mock'),
+  OCR_PROVIDER: z.enum(['disabled', 'google_vision']).default('disabled'),
   OCR_API_KEY: z.string().optional(),
+  BARCODE_PROVIDER: z.enum(['disabled', 'open_food_facts']).default('disabled'),
   // Server-side-only key for the Gemini AI adapter. Never expose to clients.
   GEMINI_API_KEY: z.string().optional(),
 });
